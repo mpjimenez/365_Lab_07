@@ -26,7 +26,6 @@ public class InnReservations {
             try (Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery(sql)) {
 
-                // Step 5: Receive results
                 while (rs.next()) {
                     String roomCode = rs.getString("RoomCode");
                     BigDecimal basePrice = rs.getBigDecimal("basePrice");
