@@ -15,9 +15,12 @@ import java.util.ArrayList;
 
 public class InnReservations {
     public static void main(String[] args) throws SQLException {
-        try (Connection conn = DriverManager.getConnection(System.getenv("HP_JDBC_URL"),
-                System.getenv("HP_JDBC_USER"),
-                System.getenv("HP_JDBC_PW"))) {
+//        try (Connection conn = DriverManager.getConnection(System.getenv("HP_JDBC_URL"),
+//                System.getenv("HP_JDBC_USER"),
+//                System.getenv("HP_JDBC_PW"))) {
+        try (Connection conn = DriverManager.getConnection(
+                args[0], args[1], args[2]
+        )) {
             String sql = "select * from lab7_rooms limit 1";
 
             try (Statement stmt = conn.createStatement();
@@ -27,7 +30,7 @@ public class InnReservations {
                 while (rs.next()) {
                     String roomCode = rs.getString("RoomCode");
                     BigDecimal basePrice = rs.getBigDecimal("basePrice");
-                    System.out.format("roomCode: %s\nbasePrice: %d", roomCode, basePrice);
+                    System.out.format("roomCode: %s\nbasePrice: %f\n", roomCode, basePrice);
                 }
             }
         }
