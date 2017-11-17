@@ -14,3 +14,6 @@
 
 #out directory
 /out
+
+#ide files
+/.idea
