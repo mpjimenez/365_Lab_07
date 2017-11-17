@@ -1,3 +1,4 @@
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.Connection;
@@ -13,4 +14,22 @@ import java.util.List;
 import java.util.ArrayList;
 
 public class InnReservations {
+    public static void main(String[] args) throws SQLException {
+        try (Connection conn = DriverManager.getConnection(System.getenv("HP_JDBC_URL"),
+                System.getenv("HP_JDBC_USER"),
+                System.getenv("HP_JDBC_PW"))) {
+            String sql = "select * from lab7_rooms limit 1";
+
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+
+                // Step 5: Receive results
+                while (rs.next()) {
+                    String roomCode = rs.getString("RoomCode");
+                    BigDecimal basePrice = rs.getBigDecimal("basePrice");
+                    System.out.format("roomCode: %s\nbasePrice: %d", roomCode, basePrice);
+                }
+            }
+        }
+    }
 }
