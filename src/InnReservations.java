@@ -14,32 +14,118 @@ import java.util.List;
 import java.util.ArrayList;
 
 public class InnReservations {
-    public static void testConnection(Connection conn) throws SQLException {
-        String sql = "select * from lab7_rooms limit 1";
 
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+   public static void main(String[] args)  {
+  
+      Scanner input = new Scanner(System.in);
+      String option = "A";
+   
+      while (!option.equals("5")) {
 
-            while (rs.next()) {
-                String roomCode = rs.getString("RoomCode");
-                BigDecimal basePrice = rs.getBigDecimal("basePrice");
-                System.out.format("roomCode: %s\nbasePrice: %f\n", roomCode, basePrice);
+         printMenu();
+         option = input.nextLine();
+      
+         switch(option) {
+            case "1":
+            try {
+            RoomRates(args);
+            } catch (SQLException e) {
+               System.err.println("SQLException: " + e.getMessage());
+              }
+            break;
+
+            case "2":
+            try {
+               Reservations(args);
+            } catch (SQLException e) {
+               System.err.println("SQLException: " + e.getMessage());
+              }
+            break;
+   
+            case "3":
+            try {
+               DetailedReservationInfo(args);
+            } catch (SQLException e) {
+               System.err.println("SQLException: " + e.getMessage());
+              }
+            break;
+
+            case "4":
+            try {
+              Revenue(args);
+            } catch (SQLException e) {
+               System.err.println("SQLException: " + e.getMessage());
+              }
+            break;
+   
+         }
+      }
+   }
+
+   public static void printMenu() {
+      String line = "Enter the number that cooresponds" +
+                    "to your desired action\n\n";
+
+      System.out.println("Rooms and Rates [1]");
+      System.out.println("Reservations [2]");
+      System.out.println("Detailed Reservation Information [3]");
+      System.out.println("Revenue [4]");
+      System.out.println("Quit [5]\n"); 
+   }
+
+   public static void RoomRates(String[] envVar) throws SQLException {
+      if (envVar.length != 3) {
+         try (Connection conn = DriverManager.getConnection(
+                                                System.getenv("HP_JDBC_URL"),
+                                                System.getenv("HP_JDBC_USER"),
+                                                System.getenv("HP_JDBC_PW"))) {
+
+            String sql = "select * from lab7_rooms limit 2";
+            try (Statement stmt = conn.createStatement();
+               ResultSet rs = stmt.executeQuery(sql)) {
+            
+               while (rs.next()) {
+                  String roomCode = rs.getString("RoomCode");
+                  BigDecimal basePrice = rs.getBigDecimal("basePrice");
+                  System.out.format("roomCode: %s\nbasePrice: %f\n",
+                                       roomCode, basePrice);
+                  System.out.print("\n");
+               } 
             }
-        }
-    }
-    public static void main(String[] args) throws SQLException {
-        if (args.length != 3) {
-            try (Connection conn = DriverManager.getConnection(
-                    System.getenv("HP_JDBC_URL"),
-                    System.getenv("HP_JDBC_USER"),
-                    System.getenv("HP_JDBC_PW"))) {
-                testConnection(conn);
+         }
+      }
+      
+      else {
+         try (Connection conn = DriverManager.getConnection(
+                                              envVar[0], envVar[1], envVar[2])) {
+         
+            String sql = "select * from lab7_rooms limit 2";
+            try (Statement stmt = conn.createStatement();
+               ResultSet rs = stmt.executeQuery(sql)) {
+            
+               while (rs.next()) {
+                  String roomCode = rs.getString("RoomCode");
+                  BigDecimal basePrice = rs.getBigDecimal("basePrice");
+                  System.out.format("roomCode: %s\nbasePrice: %f\n",
+                                       roomCode, basePrice);
+               } 
             }
-        }
-        else {
-            try (Connection conn = DriverManager.getConnection(args[0], args[1], args[2])) {
-                testConnection(conn);
-            }
-        }
-    }
+         }
+      }
+   }          
+   
+
+   public static void Reservations(String[] envVar) throws SQLException {
+
+   }
+
+   public static void DetailedReservationInfo(String[] envVar) throws SQLException {
+
+   }
+
+   public static void Revenue(String[] envVar) throws SQLException {
+
+   }
+
 }
+
