@@ -1,3 +1,5 @@
+
+
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -5,7 +7,9 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.Date;
 
+import java.text.SimpleDateFormat;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.LinkedHashMap;
@@ -116,7 +120,34 @@ public class InnReservations {
    
 
    public static void Reservations(String[] envVar) throws SQLException {
+      Scanner reader = new Scanner(System.in);
+      Reservation reservation = new Reservation();
 
+      System.out.println("ENTER YOUR FIRST NAME: ");
+      reservation.firstName = reader.nextLine();
+
+      System.out.println("ENTER YOUR LAST NAME: ");
+      reservation.lastName = reader.nextLine();
+
+      System.out.println("ENTER YOUR DESIRED ROOM CODE: ");
+      reservation.roomCode = reader.nextLine();
+
+      System.out.println("ENTER YOUR DESIRED BED TYPE: ");
+      reservation.bedType = reader.nextLine();
+
+      System.out.println("ENTER DESIRED CHECKIN DATE (format: yyyy-MM-dd): ");
+      reservation.startDate = stringToSqlDate(reader.nextLine());
+
+      System.out.println("ENTER DESIRED CHECKOUT DATE (format: yyyy-MM-dd): ");
+      reservation.endDate = stringToSqlDate(reader.nextLine());
+
+      System.out.println("ENTER NUMBER OF CHILDREN: ");
+      reservation.numChildren = Integer.parseInt(reader.nextLine());
+
+      System.out.println("ENTER NUMBER OF ADULTS: ");
+      reservation.numAdults = Integer.parseInt(reader.nextLine());
+
+      System.out.println(reservation);
    }
 
    public static void DetailedReservationInfo(String[] envVar) throws SQLException {
@@ -127,5 +158,9 @@ public class InnReservations {
 
    }
 
+
+   public static Date stringToSqlDate(String date) {
+      return Date.valueOf(date);
+   }
 }
 
