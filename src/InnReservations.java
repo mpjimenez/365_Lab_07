@@ -1,5 +1,3 @@
-
-
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -16,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.StringJoiner;
 
 public class InnReservations {
 
@@ -77,16 +76,23 @@ public class InnReservations {
       System.out.println("Quit [5]\n"); 
    }
 
+	
+
    public static void RoomRates(String[] envVar) throws SQLException {
       if (envVar.length != 3) {
          try (Connection conn = DriverManager.getConnection(
                                                 System.getenv("HP_JDBC_URL"),
                                                 System.getenv("HP_JDBC_USER"),
                                                 System.getenv("HP_JDBC_PW"))) {
-
-            String sql = "select * from lab7_rooms limit 2";
-            try (Statement stmt = conn.createStatement();
-               ResultSet rs = stmt.executeQuery(sql)) {
+            // creating PreparedStatement 
+            String sql = "select * from lab7_rooms where bedType = ?";
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+            
+            // insert parameter into preparedStatement
+            preparedStatement.setString(1, "King");
+            
+            //execute preparedStatement
+            try(ResultSet rs = preparedStatement.executeQuery()){
             
                while (rs.next()) {
                   String roomCode = rs.getString("RoomCode");
@@ -103,15 +109,22 @@ public class InnReservations {
          try (Connection conn = DriverManager.getConnection(
                                               envVar[0], envVar[1], envVar[2])) {
          
-            String sql = "select * from lab7_rooms limit 2";
-            try (Statement stmt = conn.createStatement();
-               ResultSet rs = stmt.executeQuery(sql)) {
+            // creating PreparedStatement 
+            String sql = "select * from lab7_rooms where bedType = ?";
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+            
+            // insert parameter into preparedStatement
+            preparedStatement.setString(1, "King");
+            
+            //execute preparedStatement
+            try(ResultSet rs = preparedStatement.executeQuery()){
             
                while (rs.next()) {
                   String roomCode = rs.getString("RoomCode");
                   BigDecimal basePrice = rs.getBigDecimal("basePrice");
                   System.out.format("roomCode: %s\nbasePrice: %f\n",
                                        roomCode, basePrice);
+                  System.out.print("\n");
                } 
             }
          }
@@ -120,6 +133,7 @@ public class InnReservations {
    
 
    public static void Reservations(String[] envVar) throws SQLException {
+			
       Scanner reader = new Scanner(System.in);
       Reservation reservation = new Reservation();
 
@@ -148,6 +162,18 @@ public class InnReservations {
       reservation.numAdults = Integer.parseInt(reader.nextLine());
 
       System.out.println(reservation);
+
+      //creates one big string using StringJoiner
+		StringJoiner joiner = new StringJoiner(" ");
+		joiner.add("select lab7_rooms.* from lab7_rooms");
+		joiner.add("inner join lab7_reservations on Room = RoomCode");
+		joiner.add("where bedType = ? and");
+		joiner.add("CheckIn = ? and Checkout = ? and");
+		joiner.add("Kids = ? and Adults = ?");
+		String joined = joiner.toString();
+		System.out.println(joined);
+
+		
    }
 
    public static void DetailedReservationInfo(String[] envVar) throws SQLException {
@@ -162,5 +188,6 @@ public class InnReservations {
    public static Date stringToSqlDate(String date) {
       return Date.valueOf(date);
    }
+
 }
 
