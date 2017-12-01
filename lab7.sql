@@ -19,3 +19,7 @@ case
 end daysOccupied
 from lab7_reservations
 where checkout > date_sub(curdate(), interval 180 day);
+
+select lab7_rooms.* from lab7_rooms  
+	inner join lab7_reservations on Room  = RoomCode 
+	where bedType = 'Queen' and CheckIn = '2017-10-23' and Checkout = '2017-10-25' and Kids = 0 and Adults = 1;
