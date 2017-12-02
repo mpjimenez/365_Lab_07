@@ -1,0 +1,38 @@
+select room,
+    round(sum(January)) Jan,
+    round(sum(February)) Feb,
+    round(sum(March)) Mar,
+    round(sum(April)) Apr,
+    round(sum(May)) May,
+    round(sum(June)) Jun,
+    round(sum(July)) Jul,
+    round(sum(August)) Aug,
+    round(sum(September)) Sep,
+    round(sum(October)) Oct,
+    round(sum(November)) Nov,
+    round(sum(December)) "Dec",
+    round(sum(January + February + March + April + May +
+        June + July + August + September + October + November + December)) YearlyRevenue
+from (
+    select room,
+        max(case when month = 1 then revenue end) January,
+        max(case when month = 2 then revenue end) February,
+        max(case when month = 3 then revenue end) March,
+        max(case when month = 4 then revenue end) April,
+        max(case when month = 5 then revenue end) May,
+        max(case when month = 6 then revenue end) June,
+        max(case when month = 7 then revenue end) July,
+        max(case when month = 8 then revenue end) August,
+        max(case when month = 9 then revenue end) September,
+        max(case when month = 10 then revenue end) October,
+        max(case when month = 11 then revenue end) November,
+        max(case when month = 12 then revenue end) December
+    from (
+        select room, sum(datediff(checkout, checkin) * rate) revenue, month(checkout) month
+        from lab7_reservations
+        where year(checkout) = 2017
+        group by room, month(checkout)
+    ) a
+    group by room
+) b
+group by room with rollup;

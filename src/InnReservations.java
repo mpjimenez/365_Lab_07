@@ -1,4 +1,7 @@
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.*;
 
 import java.sql.Date;
@@ -9,6 +12,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.StringJoiner;
+import java.util.concurrent.TimeUnit;
 
 public class InnReservations {
 
@@ -52,6 +56,9 @@ public class InnReservations {
               Revenue(args);
             } catch (SQLException e) {
                System.err.println("SQLException: " + e.getMessage());
+              }
+              catch(IOException e) {
+                 e.printStackTrace();
               }
             break;
    
@@ -130,6 +137,7 @@ public class InnReservations {
 			
       Scanner reader = new Scanner(System.in);
       Reservation reservation = new Reservation();
+      List<Object> params = new ArrayList<>();
 
       System.out.println("ENTER YOUR FIRST NAME: ");
       reservation.firstName = reader.nextLine();
@@ -137,17 +145,28 @@ public class InnReservations {
       System.out.println("ENTER YOUR LAST NAME: ");
       reservation.lastName = reader.nextLine();
 
-      System.out.println("ENTER YOUR DESIRED ROOM CODE: ");
+      System.out.println("ENTER YOUR DESIRED ROOM CODE (ANY FOR NO PREFERENCE): ");
       reservation.roomCode = reader.nextLine();
+      if (!reservation.roomCode.equalsIgnoreCase("any")) {
+         params.add(reservation.roomCode);
+      }
 
-      System.out.println("ENTER YOUR DESIRED BED TYPE: ");
+      System.out.println("ENTER YOUR DESIRED BED TYPE (ANY FOR NO PREFERENCE): ");
       reservation.bedType = reader.nextLine();
+      if (!reservation.bedType.equalsIgnoreCase("any")) {
+         params.add(reservation.bedType);
+      }
 
       System.out.println("ENTER DESIRED CHECKIN DATE (format: yyyy-MM-dd): ");
       reservation.startDate = stringToSqlDate(reader.nextLine());
+      params.add(reservation.startDate);
 
       System.out.println("ENTER DESIRED CHECKOUT DATE (format: yyyy-MM-dd): ");
       reservation.endDate = stringToSqlDate(reader.nextLine());
+      params.add(reservation.endDate);
+
+      params.add(reservation.startDate);
+      params.add(reservation.endDate);
 
       System.out.println("ENTER NUMBER OF CHILDREN: ");
       reservation.numChildren = Integer.parseInt(reader.nextLine());
@@ -155,19 +174,152 @@ public class InnReservations {
       System.out.println("ENTER NUMBER OF ADULTS: ");
       reservation.numAdults = Integer.parseInt(reader.nextLine());
 
-      System.out.println(reservation);
+      params.add(reservation.numAdults + reservation.numChildren);
 
-      //creates one big string using StringJoiner
-		StringJoiner joiner = new StringJoiner(" ");
-		joiner.add("select lab7_rooms.* from lab7_rooms");
-		joiner.add("inner join lab7_reservations on Room = RoomCode");
-		joiner.add("where bedType = ? and");
-		joiner.add("CheckIn = ? and Checkout = ? and");
-		joiner.add("Kids = ? and Adults = ?");
-		String joined = joiner.toString();
-		System.out.println(joined);
+      try (Connection conn = DriverManager.getConnection(System.getenv("HP_JDBC_URL"),
+              System.getenv("HP_JDBC_USER"),
+              System.getenv("HP_JDBC_PW"))) {
 
-		
+         StringJoiner joiner = new StringJoiner(" ");
+         joiner.add("select * from lab7_rooms where");
+         if (!reservation.roomCode.equalsIgnoreCase("any")) {
+            joiner.add("roomCode = ? and");
+         }
+         if (!reservation.bedType.equalsIgnoreCase("any")) {
+            joiner.add("bedType = ? and");
+         }
+         joiner.add("roomCode not in (select room from lab7_reservations where");
+         joiner.add("(? between checkin and checkout - interval 1 day) or");
+         joiner.add("(? between checkin + interval 1 day and checkout) or");
+         joiner.add("(? < checkin and ? > checkout))");
+         joiner.add("and maxOcc >= ?");
+
+         try (PreparedStatement statement = conn.prepareStatement(joiner.toString())) {
+            int i = 1;
+            for (Object param : params) {
+               statement.setObject(i++, param);
+            }
+
+            try (ResultSet rs = statement.executeQuery()) {
+               System.out.format("MATCHING OPEN ROOMS BETWEEN %s AND %s:\n",
+                       reservation.startDate.toString(), reservation.endDate.toString());
+               System.out.println("----------------------------------");
+               int c = 0;
+               String[] roomCodes = new String[10];
+               String[] roomNames = new String[10];
+               String[] bedTypes = new String[10];
+               Double[] basePrices = new Double[10];
+
+               while (rs.next()) {
+                  System.out.format("OPTION: %d\n", c);
+
+                  roomCodes[c] = rs.getString("roomCode");
+                  roomNames[c] = rs.getString("roomName");
+                  bedTypes[c] = rs.getString("bedType");
+                  basePrices[c] = rs.getDouble("basePrice");
+
+                  System.out.println("ROOM CODE: " + roomCodes[c]);
+                  System.out.println("ROOM NAME: " + roomNames[c]);
+                  System.out.println("BEDS: " + rs.getInt("beds"));
+                  System.out.println("BED TYPE: " + bedTypes[c]);
+                  System.out.println("MAX OCCUPANCY: " + rs.getInt("maxOcc"));
+                  System.out.println("BASE PRICE: " + basePrices[c]);
+                  System.out.println("DECOR: " + rs.getString("decor"));
+                  c++;
+               }
+               System.out.println("----------------------------------");
+               System.out.println("ENTER AN OPTION NUMBER TO BOOK (OR CANCEL TO CANCEL)");
+               String choice = reader.nextLine();
+               if (!choice.equalsIgnoreCase("cancel")) {
+                  int index = Integer.parseInt(choice);
+                  System.out.println("BOOKING CONFIRMATION: ");
+                  System.out.println("----------------------------------");
+                  System.out.println("NAME: " + reservation.firstName + " " + reservation.lastName);
+                  System.out.println("ROOM CODE: " + roomCodes[index]);
+                  System.out.println("ROOM NAME: " + roomNames[index]);
+                  System.out.println("BED TYPE: " + bedTypes[index]);
+                  System.out.format("DATE: %s TO %s\n", reservation.startDate, reservation.endDate);
+                  System.out.println("ADULTS: " + reservation.numAdults);
+                  System.out.println("CHILDREN: " + reservation.numChildren);
+
+                  int[] days = getWeekdaysBetweenTwoDates(reservation.startDate, reservation.endDate);
+                  double cost = days[0] * basePrices[index];
+                  cost += days[1] * basePrices[index] * 1.1;
+                  cost *= 1.18;
+                  System.out.format("TOTAL COST: %.2f\n", cost);
+                  System.out.println("----------------------------------");
+                  System.out.println("CONFIRM OR CANCEL: ");
+                  String input = reader.nextLine();
+
+                  if (input.equalsIgnoreCase("confirm")) {
+                     List<Object> parameters = new ArrayList<>();
+                     parameters.add(System.currentTimeMillis() / 1000);
+                     parameters.add(roomCodes[index]);
+                     parameters.add(reservation.startDate);
+                     parameters.add(reservation.endDate);
+                     parameters.add(basePrices[index]);
+                     parameters.add(reservation.lastName);
+                     parameters.add(reservation.firstName);
+                     parameters.add(reservation.numAdults);
+                     parameters.add(reservation.numChildren);
+
+                     String query = "insert into lab7_reservations (code, room, checkin, checkout, rate, lastname, firstname, adults, kids) values ";
+                     query += "(?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+                     try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                        int count = 1;
+                        for (Object param : parameters) {
+                           stmt.setObject(count++, param);
+                        }
+                        boolean exRes = stmt.execute();
+                        if (exRes) {
+                           System.out.println("ERROR BOOKING RESERVATION.");
+                        }
+                        else {
+                           System.out.println("RESERVATION BOOKED SUCCESSFULLY.");
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   private static int[] getWeekdaysBetweenTwoDates(Date startDate, Date endDate) {
+      Calendar startCal = Calendar.getInstance();
+      startCal.setTime(startDate);
+      int[] weekdaysWeekends = new int[2];
+
+      Calendar endCal = Calendar.getInstance();
+      endCal.setTime(endDate);
+
+      int workDays = 0;
+
+      if (startCal.getTimeInMillis() == endCal.getTimeInMillis()) {
+         int[] array = {0, 0};
+         return array;
+      }
+
+      if (startCal.getTimeInMillis() > endCal.getTimeInMillis()) {
+         startCal.setTime(endDate);
+         endCal.setTime(startDate);
+      }
+
+      do {
+         if (startCal.get(Calendar.DAY_OF_WEEK) != Calendar.SATURDAY && startCal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
+            ++workDays;
+         }
+         startCal.add(Calendar.DAY_OF_MONTH, 1);
+      } while (startCal.getTimeInMillis() < endCal.getTimeInMillis()); //excluding end date
+      weekdaysWeekends[0] = workDays;
+      weekdaysWeekends[1] = (int) getDifferenceDays(startDate, endDate) - workDays;
+      return weekdaysWeekends;
+   }
+
+   private static long getDifferenceDays(Date d1, Date d2) {
+      long diff = d2.getTime() - d1.getTime();
+      return TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
    }
 
    public static void DetailedReservationInfo(String[] envVar) throws SQLException {
@@ -285,8 +437,42 @@ public class InnReservations {
       }
    }
 
-   public static void Revenue(String[] envVar) throws SQLException {
+   public static void Revenue(String[] envVar) throws SQLException, IOException {
+      String query = new String(Files.readAllBytes(Paths.get("lab7-revenue-query.txt")));
 
+      try (Connection conn = DriverManager.getConnection(System.getenv("HP_JDBC_URL"),
+              System.getenv("HP_JDBC_USER"),
+              System.getenv("HP_JDBC_PW"))) {
+
+         try (PreparedStatement statement = conn.prepareStatement(query)) {
+            System.out.println("\n\tJan\tFeb\tMar\tApr\tMay\tJun\tJul\tAug\tSep\tOct\tNov\tDec\tYearTotal");
+            try (ResultSet rs = statement.executeQuery()) {
+               while (rs.next()) {
+                  String room = rs.getString("room");
+                  if (room == null) {
+                     System.out.print("TOTAL");
+                  }
+                  else {
+                     System.out.print(room);
+                  }
+                  System.out.print("\t" + rs.getInt("Jan"));
+                  System.out.print("\t" + rs.getInt("Feb"));
+                  System.out.print("\t" + rs.getInt("Mar"));
+                  System.out.print("\t" + rs.getInt("Apr"));
+                  System.out.print("\t" + rs.getInt("May"));
+                  System.out.print("\t" + rs.getInt("Jun"));
+                  System.out.print("\t" + rs.getInt("Jul"));
+                  System.out.print("\t" + rs.getInt("Aug"));
+                  System.out.print("\t" + rs.getInt("Sep"));
+                  System.out.print("\t" + rs.getInt("Oct"));
+                  System.out.print("\t" + rs.getInt("Nov"));
+                  System.out.print("\t" + rs.getInt("Dec"));
+                  System.out.println("\t" + rs.getInt("YearlyRevenue"));
+                  System.out.println();
+               }
+            }
+         }
+      }
    }
 
 
