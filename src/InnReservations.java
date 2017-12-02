@@ -80,54 +80,83 @@ public class InnReservations {
 	
 
    public static void RoomRates(String[] envVar) throws SQLException {
-      if (envVar.length != 3) {
-         try (Connection conn = DriverManager.getConnection(
-                                                System.getenv("HP_JDBC_URL"),
-                                                System.getenv("HP_JDBC_USER"),
-                                                System.getenv("HP_JDBC_PW"))) {
-            // creating PreparedStatement 
-            String sql = "select * from lab7_rooms where bedType = ?";
-            PreparedStatement preparedStatement = conn.prepareStatement(sql);
-            
-            // insert parameter into preparedStatement
-            preparedStatement.setString(1, "King");
-            
-            //execute preparedStatement
-            try(ResultSet rs = preparedStatement.executeQuery()){
-            
-               while (rs.next()) {
-                  String roomCode = rs.getString("RoomCode");
-                  BigDecimal basePrice = rs.getBigDecimal("basePrice");
-                  System.out.format("roomCode: %s\nbasePrice: %f\n",
-                                       roomCode, basePrice);
-                  System.out.print("\n");
-               } 
+      try (Connection conn = DriverManager.getConnection(
+              System.getenv("HP_JDBC_URL"),
+              System.getenv("HP_JDBC_USER"),
+              System.getenv("HP_JDBC_PW"))) {
+         // Step 2: Construct SQL statement
+         StringJoiner joiner = new StringJoiner(" ");
+         joiner.add("SELECT *, R4.RoomPopularityScore, NextAvailCheckIn,");
+         joiner.add("LengthOfMostRecentStay, MostRecentCheckout");
+         joiner.add("FROM lab7_rooms AS RM");
+         joiner.add("INNER JOIN (");
+         joiner.add("SELECT R2.Room, SUM(R2.NumberOfDays)/180 AS RoomPopularityScore FROM");
+         joiner.add("(SELECT R.Room, R.CheckIn, R.Checkout, R.LastName, R.FirstName, DATEDIFF(R.CheckOut, R.CheckIn) AS NumberOfDays");
+         joiner.add("FROM lab7_reservations AS R");
+         joiner.add("WHERE (R.CheckIn >= DATE_SUB(CURDATE(), INTERVAL 180 DAY) AND R.Checkout <= CURDATE()) OR");
+         joiner.add("(R.CheckIn <= DATE_SUB(CURDATE(), INTERVAL 180 DAY) AND R.Checkout >= CURDATE()) OR");
+         joiner.add("(R.CheckIn <= DATE_SUB(CURDATE(), INTERVAL 180 DAY) AND R.Checkout >= DATE_SUB(CURDATE(), INTERVAL 180 DAY))");
+         joiner.add(")AS R2");
+         joiner.add("GROUP BY R2.Room");
+         joiner.add(")AS R4");
+         joiner.add("ON R4.Room = RM.RoomCode");
+         joiner.add("INNER JOIN (");
+         joiner.add("SELECT Room, MIN(NextAvailable) AS NextAvailCheckIn FROM (");
+         joiner.add("SELECT Room, CheckIn, Checkout, MIN(Checkout) AS NextAvailable");
+         joiner.add("FROM lab7_reservations AS R1");
+         joiner.add("WHERE Checkout >= CURDATE() AND Checkout NOT IN (");
+         joiner.add("SELECT CheckIn FROM lab7_reservations");
+         joiner.add("GROUP BY Room, Checkout");
+         joiner.add("HAVING Checkout >= CURDATE() AND Room = R1.Room)");
+         joiner.add("GROUP BY Room");
+         joiner.add("UNION");
+         joiner.add("SELECT Room, CheckIn, Checkout, CURDATE() AS CurDate FROM (");
+         joiner.add("SELECT Room, CheckIn, Checkout");
+         joiner.add("FROM lab7_reservations AS R1");
+         joiner.add("WHERE Checkout >= CURDATE()");
+         joiner.add("GROUP BY Room) AS R2");
+         joiner.add("WHERE CURDATE() NOT BETWEEN R2.CheckIn AND R2.Checkout) AS R3");
+         joiner.add("GROUP BY Room");
+         joiner.add("ORDER BY Room ASC) AS R5");
+         joiner.add("ON R5.Room = RM.RoomCode");
+         joiner.add("INNER JOIN (");
+         joiner.add("SELECT Room, Checkout AS MostRecentCheckout,");
+         joiner.add("DATEDIFF(Checkout, CheckIn)AS LengthOfMostRecentStay FROM (");
+         joiner.add("SELECT Room, CheckIn, Checkout, MAX(Checkout) FROM (");
+         joiner.add("SELECT Room, CheckIn, Checkout FROM lab7_reservations AS R1");
+         joiner.add("WHERE Checkout <= CURDATE()");
+         joiner.add("GROUP BY Room, Checkout");
+         joiner.add("ORDER BY Room, Checkout DESC) AS R2");
+         joiner.add("GROUP BY Room) AS R3");
+         joiner.add("ORDER BY Room ASC) AS R6");
+         joiner.add("ON R6.Room = RM.RoomCode");
+         joiner.add("ORDER BY R4.RoomPopularityScore DESC;");
+         String sql = joiner.toString();
+
+         // Step 3: execute statement
+         try (Statement stmt = conn.createStatement();
+              ResultSet rs = stmt.executeQuery(sql)) {
+
+            // Step 4: Receive results
+            System.out.println("--------------------------------------------------------------------------------------------------------------");
+            while (rs.next()) {
+               String RoomCode = rs.getString("RoomCode");
+               String RoomName = rs.getString("RoomName");
+               int Beds = rs.getInt("Beds");
+               String bedType = rs.getString("bedType");
+               int maxOcc = rs.getInt("maxOcc");
+               float basePrice = rs.getFloat("basePrice");
+               String decor = rs.getString("decor");
+               String RoomPopularityScore = rs.getString("RoomPopularityScore");
+               String NextAvailCheckIn = rs.getString("NextAvailCheckIn");
+               String LengthOfMostRecentStay = rs.getString("LengthOfMostRecentStay");
+               String MostRecentCheckout = rs.getString("MostRecentCheckout");
+               System.out.format("%-5s %-30s %-5s %-10s %-10d ($%.2f) %20s %-10s %-20s %-10s %-10s %n",
+                       RoomCode, RoomName, Beds, bedType, maxOcc, basePrice, decor,
+                       RoomPopularityScore, NextAvailCheckIn, LengthOfMostRecentStay,
+                       MostRecentCheckout);
             }
-         }
-      }
-      
-      else {
-         try (Connection conn = DriverManager.getConnection(
-                                              envVar[0], envVar[1], envVar[2])) {
-         
-            // creating PreparedStatement 
-            String sql = "select * from lab7_rooms where bedType = ?";
-            PreparedStatement preparedStatement = conn.prepareStatement(sql);
-            
-            // insert parameter into preparedStatement
-            preparedStatement.setString(1, "King");
-            
-            //execute preparedStatement
-            try(ResultSet rs = preparedStatement.executeQuery()){
-            
-               while (rs.next()) {
-                  String roomCode = rs.getString("RoomCode");
-                  BigDecimal basePrice = rs.getBigDecimal("basePrice");
-                  System.out.format("roomCode: %s\nbasePrice: %f\n",
-                                       roomCode, basePrice);
-                  System.out.print("\n");
-               } 
-            }
+            System.out.println("");
          }
       }
    }          
@@ -225,6 +254,7 @@ public class InnReservations {
                   System.out.println("MAX OCCUPANCY: " + rs.getInt("maxOcc"));
                   System.out.println("BASE PRICE: " + basePrices[c]);
                   System.out.println("DECOR: " + rs.getString("decor"));
+                  System.out.println("----------------------------------");
                   c++;
                }
                System.out.println("----------------------------------");
